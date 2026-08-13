@@ -306,8 +306,8 @@ function renderCalendar(){
  for(let i=0;i<first.getDay();i++)out+='<div></div>';
  for(let day=1;day<=last.getDate();day++){
    let dt=new Date(y,m,day),ds=localDateString(dt),due=dueDate(c,ds),got=receivedFor(c,ds);
-   let isPast=due&&ds<today()&&got<Number(c.interest||0);
-   out+=`<div class="calday ${ds===today()?'today':''} ${isPast?'overdue':''}" ${due?`onclick="calendarDateAction(${c.id},'${ds}')"`:''}>
+   let isPast=due&&got<Number(c.interest||0); let isPaid=due&&got>=Number(c.interest||0);
+   out+=`<div class="calday ${ds===today()?'today':''} ${isPaid?'paid-day':(isPast?'overdue':'')}" ${due?`onclick="calendarDateAction(${c.id},'${ds}')"`:''}>
    <div class="calnum">${day}</div>${due?`<div class="due ${got>=c.interest?'paid':''}">₹${Number(c.interest).toLocaleString('en-IN')}</div><div class="calendar-action">${got>=c.interest?'✓ Jama':'＋ Jama'}</div>`:''}
    ${got?`<div class="meta">Jama ₹${money(got)}</div>`:''}</div>`;
  }
@@ -334,10 +334,18 @@ function saveInterestFromForm(){
 }
 function calendarDateAction(id,date){
  let c=clients.find(x=>x.id===id);if(!c)return;
- let got=receivedFor(c,date),remaining=Math.max(0,Number(c.interest)-got);
- if(remaining<=0){alert(date+' ka vyaj already jama hai: '+money(got));return}
- let amount=+prompt(c.name+' — '+date+' ka vyaj jama karein. Baki: '+money(remaining),remaining);
- if(amount>0){tx.push({id:Date.now(),clientId:id,type:'interest',amount,date});balance+=amount;save();renderCalendar();renderClientLedger();render();}
+ let interest=Number(c.interest||0);
+ let got=receivedFor(c,date),remaining=Math.max(0,interest-got);
+ if(remaining<=0){alert(date+" ka vyaj already jama hai: "+money(got));return}
+ let raw=prompt(c.name+" — "+date+" ka vyaj jama karein. Baki: "+money(remaining),remaining);
+ if(raw===null)return;
+ let amount=Number(raw);
+ if(!Number.isFinite(amount)||amount<=0){alert("Jama amount sahi bharein");return}
+ if(amount>remaining){alert("Jama amount baki vyaj se zyada nahi ho sakta. Baki: "+money(remaining));return}
+ tx.push({id:Date.now(),clientId:id,type:"interest",amount,date});
+ balance+=amount;
+ if(!save()){tx.pop();balance-=amount;alert("Vyaj jama save nahi ho saka.");return}
+ renderCalendar();renderClientLedger();render();
 }
 
 function ensureRoute(){
