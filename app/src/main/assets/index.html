@@ -94,11 +94,13 @@ input,select{width:100%;padding:11px;border:1px solid #ddd8e8;border-radius:10px
 <button class="primary save" onclick="addPartner()">＋ Partner Add</button>
 <div id="partnerList"></div></div>
 <div id="cashBookSection" class="section hidden section-page"><button class="secondary back-btn" onclick="closeSection()">← Back</button>
-<h2>📒 Pura Hisab / Cash Book</h2><div class="statline"><span>Current Available Balance</span><b class="green" id="cashBookBalance">₹0</b></div>
+<h2>📒 Pura Hisab / Cash Book</h2><button class="primary" style="width:100%;margin:8px 0" onclick="downloadCashBookPdf()">📄 Cashbook PDF</button><div class="statline"><span>Current Available Balance</span><b class="green" id="cashBookBalance">₹0</b></div>
 <div id="cashBookLedger"></div></div>
 <div id="settingsSection" class="section hidden section-page"><button class="secondary back-btn" onclick="closeSection()">← Back</button>
 <h2>⚙️ Settings</h2>
 <button class="secondary add" onclick="resetEditPassword()">🔐 Edit Password Reset</button>
+<button class="primary add" onclick="exportBackupPdf()">📦 Complete Backup PDF</button>
+<button class="secondary add" onclick="restoreBackup()">📥 Restore Backup</button>
 <button class="secondary add" onclick="enableNotifications()">🔔 Notifications ON</button>
 </div>
 <div id="clientsSection" class="section hidden section-page"><button class="secondary back-btn" onclick="closeSection()">← Back</button>

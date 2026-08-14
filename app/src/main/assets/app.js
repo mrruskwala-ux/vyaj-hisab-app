@@ -288,7 +288,7 @@ function openClient(id,fromHistory=false){
  clientView.innerHTML=`<button class="secondary back" onclick="closeClient()">← Sabhi Client</button>
  <div class="section"><h2>👤 ${esc(c.name)}</h2><div class="meta">${c.phone?'📱 '+esc(c.phone)+' • ':''}Start: ${esc(c.start)} • Har ${c.period} din ${money(c.interest)}</div>
  <div class="cards" style="margin-top:12px"><div class="card"><div class="label">Mool Baaki</div><div class="value purple">${money(principalLeft)}</div></div><div class="card"><div class="label">Vyaj Baaki</div><div class="value red">${money(unpaidAmt)}</div></div></div>
- <div class="client-actions"><button class="secondary" onclick="addReceived(${id},today())">Aaj Jama</button><button class="secondary" onclick="addPrincipal(${id})">Mool Jama</button><button class="secondary" onclick="editClient(${id})">✏️ Sabhi Edit</button><button class="danger" onclick="deleteClient(${id})">🗑️ Client Delete</button></div>
+ <div class="client-actions"><button class="secondary" onclick="addReceived(${id},today())">Aaj Jama</button><button class="secondary" onclick="addPrincipal(${id})">Mool Jama</button><button class="secondary" onclick="editClient(${id})">✏️ Sabhi Edit</button><button class="secondary" onclick="downloadClientPdf(${id})">📄 Client PDF</button><button class="danger" onclick="deleteClient(${id})">🗑️ Client Delete</button></div>
  <div class="meta">Calendar dates are calculated in local (India) date format; 24th will no longer become 23rd. </div><div class="meta">Penalty: ${c.penaltyAmount>0&&c.penaltyDays>0?money(c.penaltyAmount)+' har '+c.penaltyDays+' din':'Band'}</div></div>
  <div class="section"><h2>🔗 Client View Link</h2><div class="client-link">${esc(link)}</div><button class="primary" style="width:100%;margin-top:8px" onclick="copyClientShareLink(${id})">📤 Link Copy Karke Client Ko Bhejo</button><div class="meta" style="margin-top:7px">Is link me sirf isi client ka hisab rahega.</div></div>
  <div class="section"><h2>📆 Vyaj Calendar</h2><div class="calendar-head"><button class="secondary" onclick="changeMonth(-1)">‹</button><b id="monthTitle"></b><button class="secondary" onclick="changeMonth(1)">›</button></div><div id="calendar"></div></div>
@@ -532,6 +532,51 @@ function deleteCashBookRow(source,refId){
  }
  alert('Is entry ko yahan se delete nahi kiya ja sakta.');
 }
+function makeBackupPayload(){
+ return {version:1,app:"Vyaj Hisab",createdAt:new Date().toISOString(),clients,tx,paidInterest,expenses,expenseIns,partners,balance};
+}
+function exportBackupPdf(){
+ const data=JSON.stringify(makeBackupPayload());
+ const encoded=btoa(unescape(encodeURIComponent(data)));
+ const body=`<h2>Vyaj Hisab Complete Backup</h2><p>Is file me app ka complete data backup hai.</p><p><b>Backup Date:</b> ${pdfEsc(new Date().toLocaleString("en-IN"))}</p><p><b>Clients:</b> ${clients.length}</p><p><b>Client Entries:</b> ${tx.length}</p><p><b>Interest Out:</b> ${paidInterest.length}</p><p><b>Expenses:</b> ${expenses.length+expenseIns.length}</p><p><b>Partners:</b> ${partners.length}</p><hr><p class="meta">RESTORE_DATA_START</p><pre style="white-space:pre-wrap;word-break:break-all;font-size:7px">${pdfEsc(encoded)}</pre><p class="meta">RESTORE_DATA_END</p>`;
+ const html=makePdfHtml("Vyaj Hisab Complete Backup",body);
+ if(window.Android&&Android.saveClientHisab)Android.saveClientHisab(html,"Vyaj_Hisab_Backup.html");
+}
+function restoreBackupData(data){
+ if(!data||data.app!=="Vyaj Hisab"||data.version!==1)return false;
+ if(!Array.isArray(data.clients)||!Array.isArray(data.tx)||!Array.isArray(data.paidInterest)||!Array.isArray(data.expenses)||!Array.isArray(data.expenseIns)||!Array.isArray(data.partners))return false;
+ if(!confirm("Backup restore karna hai? Current app data replace ho jayega."))return false;
+ clients=data.clients;tx=data.tx;paidInterest=data.paidInterest;expenses=data.expenses;expenseIns=data.expenseIns;partners=data.partners;balance=Number(data.balance||0);
+ if(!save()){alert("Backup restore save nahi ho saka.");return false}
+ selectedId=null;editingId=null;showDashboard();alert("Backup successfully restore ho gaya.");return true;
+}
+
+function pdfEsc(s){return String(s??"").replace(/&/g,"\&amp;").replace(/</g,"\&lt;").replace(/>/g,"\&gt;").replace(/"/g,"\&quot;");}
+function makePdfHtml(title,body){
+ const now=new Date().toLocaleString("en-IN");
+ return `<!doctype html><html><head><meta charset="utf-8"><title>${pdfEsc(title)}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1{font-size:22px;margin-bottom:4px}h2{font-size:17px;margin-top:22px}.meta{color:#666;font-size:12px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ccc;padding:7px;text-align:left;font-size:12px}th{background:#eee}.right{text-align:right}.total{font-weight:bold;font-size:15px;margin-top:12px}</style></head><body><h1>${pdfEsc(title)}</h1><div class="meta">Generated: ${pdfEsc(now)}</div>${body}</body></html>`;
+}
+function downloadClientPdf(id){
+ const c=clients.find(x=>x.id===id);if(!c)return;
+ const principalLeft=Math.max(0,Number(c.principal)-principalPaid(c));
+ const interestLeft=unpaid(c);
+ const arr=tx.filter(x=>x.clientId===id).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+ let rows=arr.map(x=>`<tr><td>${pdfEsc(x.date)}</td><td>${x.type==="interest"?"Vyaj Jama":"Mool Jama"}</td><td class="right">${money(x.amount)}</td></tr>`).join("");
+ if(!rows)rows=`<tr><td colspan="3">Abhi koi payment entry nahi hai.</td></tr>`;
+ const body=`<h2>Client Details</h2><p><b>${pdfEsc(c.name)}</b><br>${c.phone?pdfEsc(c.phone)+"<br>":""}Start: ${pdfEsc(c.start)}<br>Har ${pdfEsc(c.period)} din Vyaj: ${money(c.interest)}</p><table><tr><th>Mool Baaki</th><th>Vyaj Baaki</th></tr><tr><td>${money(principalLeft)}</td><td>${money(interestLeft)}</td></tr></table><h2>Payment History</h2><table><tr><th>Date</th><th>Type</th><th>Amount</th></tr>${rows}</table>`;
+ const html=makePdfHtml(c.name+" - Vyaj Hisab",body);
+ if(window.Android&&Android.saveClientHisab)Android.saveClientHisab(html,c.name.replace(/[^a-zA-Z0-9_-]/g,"_")+"_Hisab.html");
+ else{const a=document.createElement("a");a.href="data:text/html;charset=utf-8,"+encodeURIComponent(html);a.download=c.name+"_Hisab.html";a.click();}
+}
+function downloadCashBookPdf(){
+ const arr=cashBookEntries();
+ let rows=arr.map(x=>`<tr><td>${pdfEsc(x.date)}</td><td>${pdfEsc(x.remark)}</td><td>${x.incoming?"Cash In":"Cash Out"}</td><td class="right">${money(x.amount)}</td><td class="right">${money(x.running)}</td></tr>`).join("");
+ if(!rows)rows=`<tr><td colspan="5">Abhi cashbook me koi entry nahi hai.</td></tr>`;
+ const body=`<div class="total">Current Balance: ${money(balance)}</div><h2>Cashbook</h2><table><tr><th>Date</th><th>Particular / Remark</th><th>Cr/Dr</th><th>Amount</th><th>Balance</th></tr>${rows}</table>`;
+ const html=makePdfHtml("Cashbook",body);
+ if(window.Android&&Android.saveClientHisab)Android.saveClientHisab(html,"Cashbook_Hisab.html");
+}
+
 function renderCashBook(){
  const el=document.getElementById('cashBookLedger'); if(!el)return;
  document.getElementById('cashBookBalance').textContent=money(balance);
