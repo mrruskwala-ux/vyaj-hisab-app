@@ -55,6 +55,10 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient());
         webView.addJavascriptInterface(new AndroidBridge(), "Android");
         webView.loadUrl("file:///android_asset/index.html");
+        webView.setOnTouchListener((v, event) -> {
+            android.util.Log.d("VYAJ_TOUCH", "ACTION=" + event.getAction() + " X=" + event.getX() + " Y=" + event.getY());
+            return false;
+        });
         webView.setFocusable(true);
         webView.setFocusableInTouchMode(true);
         webView.setClickable(true);
